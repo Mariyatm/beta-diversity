@@ -1,0 +1,122 @@
+---
+title: "Karganov expedition analysis"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is an analysis of the beta diversity and bristol score data obtained from the Karganov expedition. 
+Gut microbiota was tracked in 9 members of the Northern expedition crew. The participants included those who were already in the sea (**veterans** - 5 persons) and newly connected (**newbies** - 4 persons). Each of them had a stool sample taken before and after the expedition. So the size of all samples is 18. Further in the text **n** will denote newbies, **v** -- veterans, **0** -- before and **1** -- after. Thus n0, for example, will denote a group of samples collected from newbies before the expedition.
+
+## Beta diversity analysis:
+Beta-diversity file is numeric table 18x18 with pairwise distances between samples.
+It is important that in the table first go n0 then v0 then n1 then v1.
+
+Reading the data: 
+```{r}
+data <-read.csv("/home/maria/bioinf/expedition/beta/beta_diversity.csv")
+dt <- as.matrix(data[1:18, 2:19])
+```
+Analysis of the distance in subject before and after the expedition in a group of newbies:
+```{r}
+newbie_ba <- c(dt[1,10], dt[2,11], dt[3,12], dt[4,13])
+summary(newbie_ba)
+```
+Analysis of the distance in subject before and after the expedition in a group of veterans:
+```{r}
+veterans_ba <-c(dt[5,14], dt[6,15], dt[7,16], dt[8,17], dt[9,18])
+summary(veterans_ba)
+```
+Wilcoxon test between these two groups:
+```{r}
+wilcox.test(newbie_ba, veterans_ba, paired = FALSE,  alternative = "g")
+```
+Levene Test computes for homogeneity of variance across these groups:
+```{r}
+library('car')
+leveneTest(c(newbie_ba, veterans_ba),factor(c(1,1,1,1,2,2,2,2,2)))
+```
+
+Allocation of various groups from the beta-diversity table (for example, the group n0_n1 consists of pairwise distances between samples of newbies before and newbies after the expedition):
+```{r}
+n0_v1 <- c(dt[1:4, 14:18])
+n0_v0 <- c(dt[1:4, 5:9])
+n0_n1 <- c(dt[1:4, 10:13])
+n0_n1_without_diagonal <- n0_n1[c(c(2:5),c(7:10),c(12:15))]
+n0_n0 <- c(dt[1:4,1:4])
+n0_n0 <- n0_n0[c(c(2:5),c(7:10),c(12:15))]
+n1_n1 <- c(dt[10:13, 10:13])
+n1_n1 <- n1_n1[c(c(2:5),c(7:10),c(12:15))]
+v0_v0 <- c(dt[5:9, 5:9])
+v0_v0 <- v0_v0[c(c(2:6),c(8:12),c(14:18),c(20:24))]
+v1_v1 <- dt[14:18,14:18]
+v1_v1 <- v1_v1[c(c(2:6),c(8:12),c(14:18),c(20:24))]
+n1_v1 <- c(dt[10:13, 14:18])
+n1_v0 <- c(dt[10:13, 5:9])
+v0_v1 <- c(dt[5:9, 14:18])
+v0_v1_without_diagonal <- v0_v1[c(c(2:6),c(8:12),c(14:18),c(20:24))]
+```
+
+Boxplot of all groups:
+```{r, echo=FALSE}
+library(ggplot2)
+groups <- c(rep("v0_v0",20), rep("n0_n0",12),rep("n0_n1",12), rep("n0_v1", 20), rep("n0_v0", 20), rep("n1_v1", 20),
+            rep("n1_v0", 20), rep("v0_v1", 20),rep("v1_v1",20), rep("n1_n1",12))
+beta_divertsity <- c( v0_v0, n0_n0,n0_n1_without_diagonal, n0_v1, n0_v0, n1_v1, n1_v0, v0_v1_without_diagonal, v1_v1, n1_n1)
+dt <- data.frame(gp=groups, bd=beta_divertsity, or=c(rep(0,20),rep(1,12),rep(2,12), rep(3, 20), rep(4, 20),
+                                                     rep(5, 20), rep(6, 20), rep(7, 20),rep(8,20), rep(9,12)))
+p <- ggplot(dt, aes(x = reorder(gp, or), y=bd)) + 
+  geom_boxplot()
+p + geom_dotplot(binaxis='y', stackdir='center', dotsize=0.4) + xlab("groups") + ylab("beta diversity")
+
+```
+
+Wilcoxon test between n0_n0 and n1_n1 (significant p-value is responsible for the convergence of newbiers after the expedition):
+```{r}
+wilcox.test(n0_n0, n1_n1, paired = FALSE, alternative = 'g')
+```
+
+## Bristol score analysis:
+
+The bristol score data:
+```{r}
+before <- c(4,6,4,2,4,7,4,2,4)
+after <- c(4,4,4,4,4,5,4,4,3)
+```
+
+F test to compare two variance:
+```{r}
+var.test(before,after)
+```
+
+Boxplots of Bristol score before and after the expedition (green points are newbies, blue points are veterans). 
+```{r, echo = FALSE}
+groups <- factor(c(rep(" before",9),rep("after",9)))
+bristol_score <- c(before, after)
+bristol_plot <- ggplot(data=NULL, aes(groups, bristol_score)) + 
+  geom_boxplot()
+color = c(3, rep(4,4), 3,3,3,4, rep(4,4), rep(3,4),4)
+bristol_plot + 
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5, colour = color) + ylab("bristol score")
+
+```
+
+Bristol score in the different groups:
+```{r}
+bristol_score_n0 <- c(4,6,4,2)
+bristol_score_v0 <- c(4,7,4,2,4)
+bristol_score_n1 <- c(4,4,4,4)
+bristol_score_v1 <- c(4,5,4,4,3)
+```
+F test to compare variance of newbie's bristol score before and after expedition:
+```{r}
+var.test(bristol_score_n0, bristol_score_n1)
+```
+F test to compare variance of veteran's bristol score before and after expedition:
+```{r}
+var.test(bristol_score_v0, bristol_score_v1)
+```
